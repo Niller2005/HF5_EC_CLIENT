@@ -18,7 +18,7 @@ void getTemperatureHumidity(float &temperature, float &humidity)
   humidity = dht.ReadHumidity();
 }
 
-void httpPOST(char *path, char *body)
+void httpPOST(char *path, char body[])
 {
   char sbuffer[512];
   // Bring up the ethernet interface
@@ -33,22 +33,23 @@ void httpPOST(char *path, char *body)
   TCPSocket socket;
   socket.open(&net);
 
-  // net.gethostbyname("163.172.146.229", &a);
+  // net.gethostbyname("ifconfig.io", &a);
   a.set_ip_address("163.172.146.229");
-  a.set_port(1337);
+  a.set_port(3030);
+  printf("%s\r\n", a.get_ip_address());
   socket.connect(a);
   // Send a simple http request
   printf("%s\r\n", path);
   printf("%s\r\n", body);
-  printf("%d\r\n\r\n", sizeof body);
+  printf("%d\r\n\r\n", strlen(body));
 
-  sprintf(sbuffer, "POST %s HTTP/1.1\r\nHost: 163.172.146.229\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", path, sizeof body, body);
+  sprintf(sbuffer, "POST %s HTTP/1.1\r\nHost: 192.168.0.31:3030\r\nContent-Type: application/json\r\nAccept: */*\r\nContent-Length: %d\r\n\r\n%s", path, strlen(body), body);
   int scount = socket.send(sbuffer, sizeof sbuffer);
   printf("%s\r\n", sbuffer);
   printf("sent %d [%.*s]\n", scount, strstr(sbuffer, "\r\n") - sbuffer, sbuffer);
 
   // Recieve a simple http response and print out the response line
-  char rbuffer[512];
+  char rbuffer[2048];
   int rcount = socket.recv(rbuffer, sizeof rbuffer);
   printf("%s\r\n", rbuffer);
   printf("recv %d [%.*s]\n", rcount, strstr(rbuffer, "\r\n") - rbuffer, rbuffer);
@@ -71,7 +72,7 @@ int main(void)
   getTemperatureHumidity(temperature, humidity);
 
   net.connect();
-  sprintf(postBody, "{\"mac\":\"%s\"}", net.get_mac_address());
+  sprintf(postBody, "{\"mac\":\"%s\",\"temp\":\"%.0f\"}", net.get_mac_address(), temperature);
   net.disconnect();
   sprintf(postPath, "/devices");
 
@@ -79,10 +80,19 @@ int main(void)
 
   while (1)
   {
+    float temperature;
+    float humidity;
 
     getTemperatureHumidity(temperature, humidity);
 
-    // printf("Temperature is %.0f \r\n", temperature);
-    // printf("Humidity is %.0f \r\n", humidity);
+    net.connect();
+    sprintf(postBody, "{\"mac\":\"%s\",\"temp\":\"%.0f\"}", net.get_mac_address(), temperature);
+    net.disconnect();
+    sprintf(postPath, "/devices");
+
+    httpPOST(postPath, postBody);
+
+    printf("Temperature is %.0f \r\n", temperature);
+    printf("Humidity is %.0f \r\n", humidity);
   }
 }
